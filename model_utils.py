@@ -57,7 +57,7 @@ def model_init(model_name):
     return tokenizer, model
 
 
-def model_predict(model, tokenizer, input_data, temperature, max_new_tokens):
+def model_predict(model, tokenizer, input_data, temperature, max_new_tokens, return_latent=False):
 
     token_limit = 2048
     stop_seq = stop_sequences + [tokenizer.eos_token]
@@ -177,7 +177,6 @@ def model_predict(model, tokenizer, input_data, temperature, max_new_tokens):
         raise ValueError
 
     hidden_states = (last_token_embedding,)
-    hidden_states += (None, None)
 
     if return_latent:
         hidden_states += (sec_last_token_embedding, last_tok_bef_gen_embedding)
@@ -187,6 +186,28 @@ def model_predict(model, tokenizer, input_data, temperature, max_new_tokens):
     return_values = (sliced_answer, log_likelihoods, hidden_states)
 
     return return_values
+
+
+def get_p_true(model, tokenizer, input_data):
+    """
+        Get the probability of the model answering A (True) for the given input
+
+        :param input_data:
+    """
+
+    input_data += ' A'
+    tokenized_prompt_true = tokenizer(input_data, return_tensors='pt').to('cuda')['input_ids']
+
+    target_ids_true = tokenized_prompt_true.clone()
+    # Set all target_ids except the last one to -100.
+    target_ids_true[0, :-1] = -100
+
+    with torch.no_grad():
+        model_output_true = model(tokenized_prompt_true, labels=target_ids_true)
+
+    loss_true = model_output_true.loss
+
+    return -loss_true.item()
 
 
 def calculate_perplexity(input_data, model, tokenizer):

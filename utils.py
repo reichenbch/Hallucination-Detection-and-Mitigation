@@ -12,7 +12,7 @@ def get_reference(example):
     if answer_starts == -1:
         answer_starts = []
 
-    reference = {'answers': {'answer_start': [answer_starts], 'text': example['numerical_answer']}, 'id': example['id']}
+    reference = {'answers': {'answer_start': [answer_starts], 'text': [str(example['numerical_answer'])]}, 'id': example['id']}
     return reference
 
 
@@ -31,6 +31,7 @@ def get_metric(metric):
                 raise ValueError
 
             prediction = {'prediction_text': response, 'no_answer_probability': 0.0, 'id': exid}
+
             results = squad_metric.compute(
                 predictions=[prediction],
                 references=[get_reference(example)])

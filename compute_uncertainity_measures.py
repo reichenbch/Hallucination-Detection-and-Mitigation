@@ -113,7 +113,7 @@ def main(args):
     entropies, accuracies = defaultdict(list), defaultdict(list)
     validation_embeddings, validation_is_true, validation_answerable = [], [], []
     p_trues = []
-    count = 0  # pylint: disable=invalid-name
+    count = 0
 
     def is_answerable(generation):
         return len(generation['reference']['answers']['text']) > 0
@@ -137,7 +137,7 @@ def main(args):
             if is_answerable(example):
                 acc = metric(most_likely_answer['response'], example, None)
             else:
-                acc = 0.0  # pylint: disable=invalid-name
+                acc = 0.0
             validation_is_true.append(acc)
 
         else:
@@ -208,9 +208,24 @@ def main(args):
                     # Accuracies for alternative generations saved at last index.
                     accuracies[name].append(full_responses[max_idx_in_cluster][-1])
 
-            # pylint: disable=invalid-name
-            log_str = 'semantic_ids: %s, avg_token_log_likelihoods: %s, entropies: %s'
             entropies_fmt = ', '.join([f'{i}:{j[-1]:.2f}' for i, j in entropies.items()])
+            log_str = f'semantic_ids: {semantic_ids}, avg_token_log_likelihoods: {log_liks_agg}, entropies: {entropies_fmt}'
+            
+            print(f'NEW ITEM {idx} at id=`{tid}`.')
+            print('Context:')
+            print(example['context'])
+            print('Question:')
+            print(question)
+            print('True Answers:')
+            print(example['reference'])
+            print('Low Temperature Generation:')
+            print(most_likely_answer['response'])
+            print('Low Temperature Generation Accuracy:')
+            print(most_likely_answer['accuracy'])
+            print('High Temp Generation:')
+            print([r[0] for r in full_responses])
+            print('High Temp Generation:')
+            print(log_str)
 
         if compute_p_true_in_compute_stage:
             p_true = p_true_utils.calculate_p_true(

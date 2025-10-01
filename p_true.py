@@ -1,11 +1,12 @@
 from evaluate import load
+from model_utils import model_predict, get_p_true
 
 squad_metric = load("squad_v2")
 
 
 def construct_few_shot_prompt(
-        *, model, dataset, indices, prompt, brief, brief_always, make_prompt,
-        num_generations, metric):
+        *, model, tokenizer, dataset, indices, prompt, brief, brief_always, make_prompt,
+        num_generations, metric, max_new_tokens, token_limit=2048):
     """
         Construct few shot prompt for p_true uncertainty metric.
     """
@@ -35,7 +36,8 @@ def construct_few_shot_prompt(
             else:
                 temperature = 1.0
 
-            response, _, _ = model.predict(local_prompt, temperature)
+            #response, _, _ = model.predict(local_prompt, temperature)
+            response, _, _ = model_predict(model, tokenizer, local_prompt, temperature, max_new_tokens)
 
             responses.append(response)
             prompt_candidate += [f'{response.strip()} \n']
@@ -56,12 +58,12 @@ def construct_few_shot_prompt(
         prompt_candidate += ['The possible answer is:']
         prompt_candidate += [' A' if is_correct else ' B']
 
-        prompt_len = len(model.tokenizer.encode(''.join(few_shot_prompt + prompt_candidate)))
+        prompt_len = len(tokenizer.encode(''.join(few_shot_prompt + prompt_candidate)))
         # At test time, get a maximum of `num_generations * model.token_limit` extra tokens
         # 200 buffer for question and 'Possible Answer'.
-        max_input_len = prompt_len + num_generations * model.max_new_tokens + 200
+        max_input_len = prompt_len + num_generations * max_new_tokens + 200
 
-        if max_input_len < model.token_limit:
+        if max_input_len < token_limit:
             few_shot_prompt.extend(prompt_candidate)
         else:
             print('Cutting of p_true prompt at length %d.', it)
@@ -71,7 +73,7 @@ def construct_few_shot_prompt(
 
 
 def calculate_p_true(
-        model, question, most_probable_answer, brainstormed_answers,
+        model, tokenizer, question, most_probable_answer, brainstormed_answers,
         few_shot_prompt, hint=False):
     """
         Calculate p_true uncertainty metric.
@@ -95,6 +97,6 @@ def calculate_p_true(
     else:
         prompt += 'Do the brainstormed answers match the possible answer? Respond with A if they do, if they do not respond with B. Answer:'
 
-    log_prob = model.get_p_true(prompt)
+    log_prob = get_p_true(model, tokenizer, prompt)
 
     return log_prob

@@ -5,12 +5,12 @@ import random
 import logging
 import numpy as np
 from tqdm import tqdm
-from model_utils import model_init
+from model_utils import model_init, model_predict
 from utils import get_metric, get_reference, save
 from dataset_prep import get_dataset, get_make_prompt, split_dataset
 
-from compute_uncertainty_measures import main as main_compute
-from uncertainty.uncertainty_measures import p_true as p_true_utils
+import p_true as p_true_utils
+from compute_uncertainity_measures import main as main_compute
 
 
 def main(args):
@@ -18,7 +18,7 @@ def main(args):
     random.seed(10)
 
     # todo - clean this up
-    metric = get_metric('squad_v2')
+    metric = get_metric('squad')
 
     dataset_name = 'gsm8k'
     answerable_only = False
@@ -36,7 +36,7 @@ def main(args):
     p_true_hint = False
 
     running_parameters = {'brief_prompt': 'default', 'brief_always': False,
-                          'enable_brief': True, 'use_context': False }
+                          'enable_brief': True, 'use_context': False}
 
     train_dataset, validation_dataset, answerable_indices, unanswerable_indices, remaining_answerable, experiment_details = get_dataset(
         dataset_name, experiment_details, 5, running_parameters)
@@ -61,11 +61,11 @@ def main(args):
 
         # todo
         p_true_few_shot_prompt, p_true_responses, len_p_true = p_true_utils.construct_few_shot_prompt(
-            model=model, dataset=train_dataset, indices=p_true_indices,
+            model=model, tokenizer=tokenizer, dataset=train_dataset, indices=p_true_indices,
             prompt=experiment_details['prompt'], brief=experiment_details['BRIEF'],
             brief_always=brief_always and enable_brief,
             make_prompt=make_prompt, num_generations=num_generations,
-            metric=metric)
+            metric=metric, max_new_tokens=max_new_tokens)
 
         experiment_details['p_true_indices'] = p_true_indices
         experiment_details['p_true_responses'] = p_true_responses
@@ -128,9 +128,9 @@ def main(args):
                 temperature = 0.1 if i == 0 else temperature
 
                 predicted_answer, token_log_likelihoods, (
-                embedding, emb_last_before_gen, emb_before_eos) = model.predict(model, tokenizer, local_prompt,
-                                                                                temperature, max_new_tokens,
-                                                                                return_latent=True)
+                    embedding, emb_last_before_gen, emb_before_eos) = model_predict(model, tokenizer, local_prompt,
+                                                                                    temperature, max_new_tokens,
+                                                                                    return_latent=True)
 
                 # Last token embedding
                 embedding = embedding.cpu() if embedding is not None else None
@@ -141,7 +141,7 @@ def main(args):
                 if correct_answer and compute_acc:
                     acc = metric(predicted_answer, example, model)
                 else:
-                    acc = 0.0  # pylint: disable=invalid-name
+                    acc = 0.0
 
                 if i == 0:
                     accuracies.append(acc)
@@ -195,11 +195,10 @@ def main(args):
 
 
 if __name__ == '__main__':
-
     args = dict()
     args['temperature'] = 1.0
     args['num_samples'] = 400
-    args['metric'] = 'squad_v2'
+    args['metric'] = 'squad'
     args['enable_brief'] = True
 
     args['p_true_hint'] = False
@@ -217,9 +216,12 @@ if __name__ == '__main__':
     args['p_true_num_fewshot'] = 20
     args['brief_prompt'] = 'default'
 
+    args['compute_uncertainties'] = True
     args['get_training_set_generations'] = True
     args['compute_accuracy_at_all_temps'] = True
     args['get_training_set_generations_most_likely_only'] = True
 
     main(args)
-    main_compute(args)
+
+    if args['compute_uncertainties']:
+        main_compute(args)
