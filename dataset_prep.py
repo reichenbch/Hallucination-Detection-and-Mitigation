@@ -103,6 +103,8 @@ def load_ds(dataset_name):
         dataset = load_dataset("openai/gsm8k", "main")
         dataset = dataset.map(dataset_pre_process)
 
+        dataset = dataset.filter(lambda x: x['id'] != '229204758988173734073362288035613840709')
+
         test_valid_split = dataset['test'].train_test_split(test_size=0.2)
         train_dt = dataset["train"]
         validation_dt = test_valid_split["test"]
